@@ -4010,7 +4010,7 @@ curl -X POST "{SITE_URL}/api/v1/import" \
         const key = String(item.name || '');
         const metadata = item.metadata || {};
         const isR2 = metadata.storageType === 'r2' || metadata.storage === 'r2' || key.startsWith('r2:');
-        const publicBase = String(this.systemStatus.r2PublicBaseUrl || '').replace(/\\/+$/, '');
+        const publicBase = String(this.systemStatus.r2PublicBaseUrl || '').replace(/\/+$/, '');
         if (isR2 && publicBase && !metadata.sharePasswordProtected) {
           const objectKey = metadata.r2Key || key.replace(/^r2:/, '');
           const encodedKey = String(objectKey).split('/').map(encodeURIComponent).join('/');
