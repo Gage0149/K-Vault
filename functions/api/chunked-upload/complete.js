@@ -253,7 +253,9 @@ export async function onRequestPost(context) {
 
     return jsonResponse({
       success: true,
-      src: `/file/${responseFileKey}`,
+      src: storageType === 'r2'
+        ? getR2PublicUrl(env, responseFileKey.replace(/^r2:/, ''))
+        : `/file/${responseFileKey}`,
       fileName: taskData.fileName,
       fileSize: taskData.fileSize,
     });
@@ -417,6 +419,7 @@ async function uploadToR2(file, fileExtension, env) {
   await env.R2_BUCKET.put(objectKey, arrayBuffer, {
     httpMetadata: {
       contentType: file.type || 'application/octet-stream',
+      cacheControl: R2_PUBLIC_CACHE_CONTROL,
     },
     customMetadata: {
       fileName: file.name,
