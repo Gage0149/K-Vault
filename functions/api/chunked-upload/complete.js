@@ -18,6 +18,7 @@ import {
   shouldUseSignedTelegramLinks,
   shouldWriteTelegramMetadata,
 } from '../../utils/telegram.js';
+import { getR2PublicUrl, R2_PUBLIC_CACHE_CONTROL } from '../../utils/r2-public-url.js';
 
 const TEMP_CHUNK_PREFIX = 'chunk-upload';
 const MB = 1024 * 1024;
