@@ -5103,13 +5103,12 @@
             this.uploadedFiles.splice(index, 1);
           },
 
-          // 下载文件
+          // 下载文件：明确下载动作继续走本站文件代理，保留下载行为和文件名处理。
           downloadFile(file) {
-            const url = this.getLocalFileUrl(file);
+            const url = this.getDownloadFileUrl(file);
             if (!url) return;
             const link = document.createElement("a");
             link.href = url;
-            // 使用安全的文件名获取方法
             link.download = this.getDisplayName(file);
             link.click();
           },
@@ -5330,6 +5329,21 @@
 
           getLocalFileUrl(item) {
             return this.getCleanFileUrl(item, this.baseURL);
+          },
+
+          getDownloadFileUrl(item) {
+            const rawUrl = String(item.path || item.url || "");
+            const metadata = item.metadata || {};
+            const r2KeyMatch = rawUrl.match(/(?:^|\/)file\/r2:([^?#]+)/) || rawUrl.match(/^r2:([^?#]+)/);
+            const isR2 = item.storageType === "r2" || item.storageMode === "r2" ||
+              metadata.storageType === "r2" || metadata.storage === "r2" || Boolean(r2KeyMatch);
+            if (!isR2) return this.getLocalFileUrl(item);
+
+            let r2Key = metadata.r2Key || r2KeyMatch?.[1] || "";
+            if (!r2Key && /^https?:\/\//i.test(rawUrl)) {
+              try { r2Key = decodeURIComponent(new URL(rawUrl).pathname.replace(/^\/+/, "")); } catch (e) {}
+            }
+            return r2Key ? `${this.baseURL}/file/r2:${encodeURIComponent(r2Key)}` : this.getLocalFileUrl(item);
           },
 
           // 从 URL 中提取当前站点的文件路径
