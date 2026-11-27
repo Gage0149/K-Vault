@@ -1208,7 +1208,7 @@
           if (isR2 && this.r2PublicBaseUrl) {
             const objectKey = metadata.r2Key || String(img.name).replace(/^r2:/, '');
             const encodedKey = String(objectKey).split('/').map(encodeURIComponent).join('/');
-            return `${this.r2PublicBaseUrl.replace(/\\/+$/, '')}/${encodedKey}`;
+            return `${this.r2PublicBaseUrl.replace(/\/+$/, '')}/${encodedKey}`;
           }
           return `${linkBaseURL}/file/${encodeURIComponent(img.name)}`;
         },
