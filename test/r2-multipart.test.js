@@ -151,6 +151,24 @@ describe('Pages native R2 multipart API', function () {
     assert.equal(completed.size, 1);
   });
 
+
+  it('sets CDN cache metadata and returns the direct R2 custom-domain URL when configured', async function () {
+    env.R2_PUBLIC_BASE_URL = 'https://img.example.com/';
+    const session = await begin();
+    const [objectKey, options] = [...uploads.entries()][0];
+    assert.equal(options.httpMetadata.cacheControl, 'public, max-age=3600, s-maxage=86400');
+
+    const parts = Array.from({ length: 8 }, (_, index) => ({ partNumber: index + 1, etag: String(index).repeat(171) }));
+    const response = await request('POST', {
+      suffix: '?action=complete',
+      session,
+      json: { parts },
+    });
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.src, `https://img.example.com/${objectKey}`);
+  });
+
   it('aborts an incomplete upload idempotently and rejects subsequent parts', async function () {
     const session = await begin();
     for (let i = 0; i < 2; i++) {
