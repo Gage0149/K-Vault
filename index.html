@@ -5799,20 +5799,6 @@
               );
               this.githubAvailable = this.storageEnabledFromStatus(status.github);
 
-              // 首次升级时将默认存储切换为 R2；之后尊重用户手动选择并保留 Telegram 备用模式。
-              const defaultStorageMigrationKey = "kvault:r2-default-storage-v1";
-              const savedMode = localStorage.getItem("storageMode");
-              const shouldApplyR2Default = this.r2Available && localStorage.getItem(defaultStorageMigrationKey) !== "1";
-              if (shouldApplyR2Default) {
-                this.storageMode = "r2";
-                this.storageTarget = "R2 存储桶";
-                localStorage.setItem("storageMode", "r2");
-                localStorage.setItem(defaultStorageMigrationKey, "1");
-              } else if (!savedMode && this.r2Available) {
-                this.storageMode = "r2";
-                this.storageTarget = "R2 存储桶";
-                localStorage.setItem("storageMode", "r2");
-              } else {
               const modeAvailability = {
                 r2: this.r2Available,
                 s3: this.s3Available,
@@ -5829,25 +5815,32 @@
                 github: "GitHub 仓库",
               };
 
-              // 如果保存的模式可用（且非访客模式或是 telegram/r2），恢复之
-              if (savedMode && modeLabels[savedMode]) {
-                if (savedMode === "telegram") {
+              // 首次升级时将默认存储切换为 R2；之后尊重用户手动选择并保留 Telegram 备用模式。
+              const defaultStorageMigrationKey = "kvault:r2-default-storage-v1";
+              const savedMode = localStorage.getItem("storageMode");
+              const shouldApplyR2Default = this.r2Available && localStorage.getItem(defaultStorageMigrationKey) !== "1";
+              if (shouldApplyR2Default) {
+                this.storageMode = "r2";
+                this.storageTarget = modeLabels.r2;
+                localStorage.setItem("storageMode", "r2");
+                localStorage.setItem(defaultStorageMigrationKey, "1");
+              } else {
+                const preferredMode = savedMode && modeLabels[savedMode]
+                  ? savedMode
+                  : (this.r2Available ? "r2" : "telegram");
+                if (preferredMode === "telegram") {
                   this.storageMode = "telegram";
-                  this.storageTarget = modeLabels["telegram"];
-                } else if (modeAvailability[savedMode] && !this.isGuest) {
-                  this.storageMode = savedMode;
-                  this.storageTarget = modeLabels[savedMode];
-                } else if (savedMode === "r2" && this.r2Available) {
+                  this.storageTarget = modeLabels.telegram;
+                } else if (modeAvailability[preferredMode] && !this.isGuest) {
+                  this.storageMode = preferredMode;
+                  this.storageTarget = modeLabels[preferredMode];
+                } else if (preferredMode === "r2" && this.r2Available) {
                   this.storageMode = "r2";
-                  this.storageTarget = modeLabels["r2"];
+                  this.storageTarget = modeLabels.r2;
                 } else {
                   this.storageMode = "telegram";
-                  this.storageTarget = modeLabels["telegram"];
+                  this.storageTarget = modeLabels.telegram;
                 }
-              } else {
-                this.storageMode = this.r2Available ? "r2" : "telegram";
-                this.storageTarget = modeLabels[this.storageMode];
-              }
               }
             } catch (e) {
               this.storageMode = "telegram";
