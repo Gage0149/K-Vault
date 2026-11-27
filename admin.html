@@ -4142,7 +4142,8 @@ curl -X POST "{SITE_URL}/api/v1/import" \
         this.selectedFiles.forEach((file, index) => {
           setTimeout(() => {
             const link = document.createElement('a');
-            link.href = this.fileLink(file.name);
+            // 显式下载保留本站代理路径，直链复制和图片预览仍使用 R2 CDN。
+            link.href = `${this.baseURL}/file/${encodeURIComponent(file.name)}`;
             if (file.metadata?.sharePasswordProtected) {
               link.target = '_blank';
               link.rel = 'noopener noreferrer';
