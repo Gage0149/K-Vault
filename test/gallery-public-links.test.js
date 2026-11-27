@@ -77,7 +77,26 @@ describe('Gallery public access links', function () {
     });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('Cache-Control'), 'no-store');
-    assert.deepEqual(await response.json(), { publicBaseUrl: 'https://images-b.example/cache' });
+    assert.deepEqual(await response.json(), { publicBaseUrl: 'https://images-b.example/cache', r2PublicBaseUrl: '' });
+  });
+
+
+  it('uses the R2 custom domain for existing R2 objects and leaves Telegram links on Pages', async function () {
+    const { page } = loadGalleryPage({ r2PublicBaseUrl: 'https://img.example.com' });
+    await page.loadPublicBaseUrl();
+    const r2Image = {
+      name: 'r2:r2_existing.jpg',
+      selected: true,
+      metadata: { storageType: 'r2', r2Key: 'r2_existing.jpg', fileName: 'Existing R2 image' },
+    };
+    const telegramImage = { name: 'telegram-file.jpg', selected: false, metadata: { storageType: 'telegram' } };
+    assert.equal(page.getImageUrl(r2Image), 'https://img.example.com/r2_existing.jpg');
+    assert.equal(page.getImageUrl(telegramImage), 'https://site-a.example/file/telegram-file.jpg');
+    page.images = [r2Image];
+    let copied = '';
+    page.copyToClipboard = value => { copied = value; };
+    page.batchCopy();
+    assert.equal(copied, 'https://img.example.com/r2_existing.jpg');
   });
 
   it('does not copy public links when no different domain is configured', function () {
