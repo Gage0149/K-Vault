@@ -1,4 +1,5 @@
 ﻿import { createS3Client } from "../utils/s3client.js";
+import { getR2PublicUrl, R2_PUBLIC_CACHE_CONTROL } from "../utils/r2-public-url.js";
 import { uploadToDiscord } from "../utils/discord.js";
 import { hasHuggingFaceConfig, uploadToHuggingFace } from "../utils/huggingface.js";
 import { hasWebDAVConfig, normalizeWebDAVPath, uploadToWebDAV } from "../utils/webdav.js";
@@ -402,7 +403,7 @@ async function uploadToR2(arrayBuffer, fileName, fileExtension, contentType, fil
     const objectKey = `${fileId}.${fileExtension}`;
 
     await env.R2_BUCKET.put(objectKey, arrayBuffer, {
-      httpMetadata: { contentType },
+      httpMetadata: { contentType, cacheControl: R2_PUBLIC_CACHE_CONTROL },
       customMetadata: { fileName, uploadTime: Date.now().toString() },
     });
 
@@ -424,7 +425,7 @@ async function uploadToR2(arrayBuffer, fileName, fileExtension, contentType, fil
       });
     }
 
-    return jsonResponse([{ src: `/file/r2:${objectKey}` }]);
+    return jsonResponse([{ src: getR2PublicUrl(env, objectKey) }]);
   } catch (error) {
     console.error("R2 upload error:", error);
     return jsonResponse({ error: `R2 upload failed: ${error.message}` }, 500);
