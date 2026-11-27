@@ -5288,19 +5288,19 @@
           getCleanFileUrl(item, linkBaseURL = this.getStoredLinkBaseURL(item.linkBaseURL, item.usedPublicBaseUrl)) {
             const rawUrl = String(item.path || item.url || "");
             const metadata = item.metadata || {};
-            const r2KeyMatch = rawUrl.match(/(?:^|\\/)file\\/r2:([^?#]+)/) || rawUrl.match(/^r2:([^?#]+)/);
+            const r2KeyMatch = rawUrl.match(/(?:^|\/)file\/r2:([^?#]+)/) || rawUrl.match(/^r2:([^?#]+)/);
             const isR2 = item.storageType === "r2" || item.storageMode === "r2" ||
               metadata.storageType === "r2" || metadata.storage === "r2" || Boolean(r2KeyMatch);
             const r2Key = metadata.r2Key || r2KeyMatch?.[1];
             if (isR2 && r2Key && this.r2PublicBaseUrl) {
               const encodedKey = String(r2Key).split("/").map(encodeURIComponent).join("/");
-              return `${this.r2PublicBaseUrl.replace(/\\/+$/, "")}/${encodedKey}`;
+              return `${this.r2PublicBaseUrl.replace(/\/+$/, "")}/${encodedKey}`;
             }
-            if (/^https?:\\/\\//i.test(rawUrl) && !rawUrl.includes("/file/")) return rawUrl;
+            if (/^https?:\/\//i.test(rawUrl) && !rawUrl.includes("/file/")) return rawUrl;
 
             // 情况1: 已经是完整的 /file/ 直链
-            if (/^https?:\\/\\//i.test(rawUrl) && rawUrl.includes("/file/")) {
-              const match = rawUrl.match(/\\/file\\/([^?#]+)/);
+            if (/^https?:\/\//i.test(rawUrl) && rawUrl.includes("/file/")) {
+              const match = rawUrl.match(/\/file\/([^?#]+)/);
               if (match) return `${linkBaseURL}/file/${match[1]}`;
             }
 
