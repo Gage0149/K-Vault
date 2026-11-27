@@ -6,6 +6,7 @@ import { checkGitHubConnection, hasGitHubConfig } from '../utils/github.js';
 import { getGuestConfig } from '../utils/guest.js';
 import { buildTelegramBotApiUrl, getTelegramApiBase } from '../utils/telegram.js';
 import { getR2MultipartMaxBytes } from '../utils/r2-multipart.js';
+import { normalizeR2PublicBaseUrl } from '../utils/r2-public-url.js';
 
 const MB = 1024 * 1024;
 const DIRECT_UPLOAD_THRESHOLD = 20 * MB;
@@ -41,13 +42,15 @@ export async function onRequestGet(context) {
   } catch (_) {
     // Leave the option unavailable when PUBLIC_BASE_URL is missing or invalid.
   }
+  const r2PublicBaseUrl = normalizeR2PublicBaseUrl(env.R2_PUBLIC_BASE_URL);
 
   if (request && new URL(request.url).searchParams.get('view') === 'public-links') {
-    return Response.json({ publicBaseUrl }, { headers: { 'Cache-Control': 'no-store' } });
+    return Response.json({ publicBaseUrl, r2PublicBaseUrl }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
   const status = {
     publicBaseUrl,
+    r2PublicBaseUrl,
     telegram: defaultStatusItem({ layer: 'direct' }),
     kv: { connected: false, enabled: false, configured: false, layer: 'direct', message: 'Not configured' },
     r2: defaultStatusItem({ layer: 'direct' }),

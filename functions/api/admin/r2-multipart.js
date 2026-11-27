@@ -6,6 +6,7 @@ import {
   R2_MULTIPART_MIN_BYTES,
   R2_MULTIPART_PART_BYTES,
 } from '../../utils/r2-multipart.js';
+import { getR2PublicUrl, R2_PUBLIC_CACHE_CONTROL } from '../../utils/r2-public-url.js';
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const encoder = new TextEncoder();
@@ -119,7 +120,7 @@ async function beginUpload(request, bucket, key, maxBytes) {
     throw new MultipartError('METADATA_TOO_LONG', '文件名和目录路径太长。');
   }
   const upload = await bucket.createMultipartUpload(objectKey, {
-    httpMetadata: { contentType: fileType },
+    httpMetadata: { contentType: fileType, cacheControl: R2_PUBLIC_CACHE_CONTROL },
     customMetadata: { fileName, kvaultMultipart: objectKey },
   });
   try {
@@ -159,7 +160,7 @@ async function publishObject(env, session, recovering = true) {
     // The object is complete. A retry can repair the index without uploading or deleting bytes.
     throw new MultipartError('INDEX_PENDING', 'R2 已接收文件，索引暂未写入，请重试完成上传。', 503);
   }
-  return apiSuccess({ src: `/file/${key}` });
+  return apiSuccess({ src: getR2PublicUrl(env, session.objectKey) });
 }
 
 async function uploadPart(request, upload, session, partNumber, totalParts) {

@@ -2,6 +2,7 @@ import { errorHandling, telemetryData } from "./utils/middleware.js";
 import { checkAuthentication, isAuthRequired } from "./utils/auth.js";
 import { checkGuestUpload, incrementGuestCount } from "./utils/guest.js";
 import { normalizeFolderPath } from "./utils/folder-path.js";
+import { getR2PublicUrl, R2_PUBLIC_CACHE_CONTROL } from "./utils/r2-public-url.js";
 import { createS3Client } from "./utils/s3client.js";
 import { uploadToDiscord } from "./utils/discord.js";
 import { hasHuggingFaceConfig, uploadToHuggingFace } from "./utils/huggingface.js";
@@ -380,7 +381,10 @@ async function uploadToR2(file, fileName, fileExtension, env, folderPath = "") {
     const arrayBuffer = await file.arrayBuffer();
 
     await env.R2_BUCKET.put(objectKey, arrayBuffer, {
-      httpMetadata: { contentType: file.type },
+      httpMetadata: {
+        contentType: file.type || 'application/octet-stream',
+        cacheControl: R2_PUBLIC_CACHE_CONTROL,
+      },
       customMetadata: { fileName, uploadTime: Date.now().toString() },
     });
 
@@ -402,7 +406,7 @@ async function uploadToR2(file, fileName, fileExtension, env, folderPath = "") {
       });
     }
 
-    return new Response(JSON.stringify([{ src: `/file/r2:${objectKey}` }]), {
+    return new Response(JSON.stringify([{ src: getR2PublicUrl(env, objectKey) }]), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });

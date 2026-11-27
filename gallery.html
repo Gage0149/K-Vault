@@ -873,7 +873,7 @@
            :key="img.name"
            :class="{ selected: img.selected }"
            @click="toggleSelect(img)">
-        <img :src="'/file/' + img.name" 
+        <img :src="getImageUrl(img)" 
              :alt="img.metadata?.fileName || img.name"
              loading="lazy"
              @error="handleImageError($event, img)">
@@ -1003,6 +1003,7 @@
       data: {
         baseURL: document.location.origin,
         publicBaseUrl: '',
+        r2PublicBaseUrl: '',
         images: [],
         loading: true,
         searchQuery: '',
@@ -1097,13 +1098,16 @@
       methods: {
         async loadPublicBaseUrl() {
           this.publicBaseUrl = '';
+          this.r2PublicBaseUrl = '';
           try {
             const response = await fetch('/api/status?view=public-links');
             if (!response.ok) return;
             const status = await response.json();
             this.publicBaseUrl = status.publicBaseUrl || '';
+            this.r2PublicBaseUrl = status.r2PublicBaseUrl || '';
           } catch (e) {
             this.publicBaseUrl = '';
+            this.r2PublicBaseUrl = '';
           }
         },
 
@@ -1198,8 +1202,19 @@
           this.images.forEach(img => img.selected = false);
         },
 
+        getImageUrl(img, linkBaseURL = this.baseURL) {
+          const metadata = img?.metadata || {};
+          const isR2 = metadata.storageType === 'r2' || metadata.storage === 'r2' || String(img?.name || '').startsWith('r2:');
+          if (isR2 && this.r2PublicBaseUrl) {
+            const objectKey = metadata.r2Key || String(img.name).replace(/^r2:/, '');
+            const encodedKey = String(objectKey).split('/').map(encodeURIComponent).join('/');
+            return `${this.r2PublicBaseUrl.replace(/\/+$/, '')}/${encodedKey}`;
+          }
+          return `${linkBaseURL}/file/${encodeURIComponent(img.name)}`;
+        },
+
         formatLink(img, linkBaseURL = this.baseURL) {
-          const url = `${linkBaseURL}/file/${img.name}`;
+          const url = this.getImageUrl(img, linkBaseURL);
           const name = img.metadata?.fileName || img.name;
           switch (this.linkFormat) {
             case 'markdown': return `![${name}](${url})`;
@@ -1266,7 +1281,7 @@
           // 文件信息
           const fileName = img.metadata?.fileName || img.name;
           // 构造绝对直链 URL（必须是完整的 https:// 链接）
-          const fileUrl = `${this.baseURL}/file/${img.name}`;
+          const fileUrl = this.getImageUrl(img);
           const ext = fileName.split('.').pop().toLowerCase();
           
           // 图片类型 - 保持原生 Lightbox 预览
@@ -1274,7 +1289,7 @@
           if (imageExts.includes(ext)) {
             this.previewData = {
               type: 'native-image',
-              url: `/file/${img.name}`,
+              url: fileUrl,
               fileName: fileName,
               img: img
             };
@@ -1327,7 +1342,8 @@
 
         downloadImage(img) {
           const link = document.createElement('a');
-          link.href = `/file/${img.name}`;
+          // 显式下载走本站代理，避免跨域链接的 download 属性被浏览器忽略。
+          link.href = `${this.baseURL}/file/${encodeURIComponent(img.name)}`;
           link.download = img.metadata?.fileName || img.name;
           link.click();
         },

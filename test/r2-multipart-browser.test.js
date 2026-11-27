@@ -104,6 +104,73 @@ describe('R2 multipart browser checkpoints', function () {
   });
 });
 
+
+describe('R2 public URL integration in the upload page', function () {
+  function loadPage(storage = new Map()) {
+    const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+    const script = html.match(/<script>\s*(const LOCAL_PREVIEW_PAGE[\s\S]*?)<\/script>/);
+    assert.ok(script, 'upload page script should exist');
+    let options;
+    vm.runInNewContext(script[1], {
+      document: { location: { origin: 'https://vault.example' } },
+      console: { error() {} },
+      AbortController,
+      URL,
+      KVaultR2Multipart: { async upload() { return '/file/r2:unused.jpg'; } },
+      localStorage: {
+        getItem: key => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, value),
+      },
+      fetch: async () => ({
+        ok: true,
+        json: async () => ({
+          publicBaseUrl: '',
+          r2PublicBaseUrl: 'https://img.example.com',
+          uploadLimits: {},
+          r2: { connected: true, enabled: true, configured: true },
+        }),
+      }),
+      Vue: function Vue(config) { options = config; },
+    });
+    return Object.assign({}, options.data, options.methods);
+  }
+
+  it('maps existing R2 proxy history links to the custom domain while leaving Telegram on Pages', function () {
+    const page = loadPage();
+    page.baseURL = 'https://vault.example';
+    page.r2PublicBaseUrl = 'https://img.example.com';
+    assert.equal(
+      page.getCleanFileUrl({ path: '/file/r2:r2_existing.jpg', usedPublicBaseUrl: false }),
+      'https://img.example.com/r2_existing.jpg'
+    );
+    assert.equal(
+      page.getCleanFileUrl({ path: 'https://img.example.com/r2_new.jpg', storageType: 'r2' }),
+      'https://img.example.com/r2_new.jpg'
+    );
+    assert.equal(
+      page.getCleanFileUrl({ path: '/file/telegram-file.jpg', usedPublicBaseUrl: false }),
+      'https://vault.example/file/telegram-file.jpg'
+    );
+    assert.equal(
+      page.getDownloadFileUrl({ path: 'https://img.example.com/r2_new.jpg', storageType: 'r2' }),
+      'https://vault.example/file/r2:r2_new.jpg'
+    );
+  });
+
+  it('switches to R2 once by default, then remembers a later manual Telegram choice', async function () {
+    const storage = new Map([['storageMode', 'telegram']]);
+    const page = loadPage(storage);
+    await page.checkStorageTarget();
+    assert.equal(page.storageMode, 'r2');
+    assert.equal(storage.get('storageMode'), 'r2');
+    assert.equal(storage.get('kvault:r2-default-storage-v1'), '1');
+
+    storage.set('storageMode', 'telegram');
+    await page.checkStorageTarget();
+    assert.equal(page.storageMode, 'telegram');
+  });
+});
+
 describe('Pages upload queue routing', function () {
   it('selects native multipart only for authenticated Pages R2 uploads above 100 MiB', async function () {
     const MiB = 1024 ** 2;

@@ -18,6 +18,7 @@ import {
   shouldUseSignedTelegramLinks,
   shouldWriteTelegramMetadata,
 } from '../../utils/telegram.js';
+import { getR2PublicUrl, R2_PUBLIC_CACHE_CONTROL } from '../../utils/r2-public-url.js';
 
 const TEMP_CHUNK_PREFIX = 'chunk-upload';
 const MB = 1024 * 1024;
@@ -253,7 +254,9 @@ export async function onRequestPost(context) {
 
     return jsonResponse({
       success: true,
-      src: `/file/${responseFileKey}`,
+      src: storageType === 'r2'
+        ? getR2PublicUrl(env, responseFileKey.replace(/^r2:/, ''))
+        : `/file/${responseFileKey}`,
       fileName: taskData.fileName,
       fileSize: taskData.fileSize,
     });
@@ -417,6 +420,7 @@ async function uploadToR2(file, fileExtension, env) {
   await env.R2_BUCKET.put(objectKey, arrayBuffer, {
     httpMetadata: {
       contentType: file.type || 'application/octet-stream',
+      cacheControl: R2_PUBLIC_CACHE_CONTROL,
     },
     customMetadata: {
       fileName: file.name,

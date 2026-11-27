@@ -1259,8 +1259,8 @@
                   @click.stop="revealPreview(item)">
                   <el-image
                     v-if="!isPreviewGated(item, 'image')"
-                    :src="'/file/' + item.name"
-                    :preview-src-list="['/file/' + item.name]"
+                    :src="fileAccessUrl(item)"
+                    :preview-src-list="[fileAccessUrl(item)]"
                     fit="cover"
                     lazy>
                   </el-image>
@@ -1320,7 +1320,7 @@
                     @click.stop="revealPreview(item)">
                     <video
                       v-if="!isPreviewGated(item, 'video')"
-                      :src="'/file/' + item.name"
+                      :src="fileAccessUrl(item)"
                       controls
                       playsinline
                       preload="metadata"
@@ -1398,7 +1398,7 @@
                     <audio
                       v-if="!isPreviewGated(item, 'audio')"
                       class="custom-audio-player"
-                      :src="'/file/' + item.name"
+                      :src="fileAccessUrl(item)"
                       controls
                       preload="metadata">
                       当前浏览器不支持音频播放
@@ -3466,7 +3466,7 @@ curl -X POST "{SITE_URL}/api/v1/import" \
         }
         this.revealPreview(item);
         const fileName = item.metadata?.fileName || item.name;
-        const fileUrl = `${this.baseURL}/file/${item.name}`;
+        const fileUrl = this.fileAccessUrl(item);
         const fileType = this.getActualFileType(item.name);
 
         // 图片类型 - 原生图片 Lightbox
@@ -3790,6 +3790,8 @@ curl -X POST "{SITE_URL}/api/v1/import" \
               const formData = new FormData();
               formData.append('file', file);
               formData.append('folderPath', this.folderPath || '');
+              const uploadStorageMode = this.systemStatus.r2.connected && this.systemStatus.r2.enabled ? 'r2' : 'telegram';
+              formData.append('storageMode', uploadStorageMode);
               const res = await fetch(`${this.baseURL}/upload`, {
                 method: 'POST',
                 body: formData,
@@ -3804,18 +3806,27 @@ curl -X POST "{SITE_URL}/api/v1/import" \
               }
               const src = data[0]?.src;
               if (!src) throw new Error('未返回文件路径');
-              // 验证并添加到列表
-              const preview = await fetch(`${this.baseURL}${src}`, {
-                credentials: 'include'
-              });
-              if (preview.ok) {
-                this.tableData.unshift({
-                  name: src.replace(/^\/file\//, ''),
-                  selected: false,
-                  metadata: { TimeStamp: Date.now(), fileSize: file.size, fileName: file.name }
-                });
-                successCount++;
+              // 绝对 R2 直链不再经过本站代理验证，避免额外的 Workers 请求。
+              if (!/^https?:\/\//i.test(src)) {
+                const preview = await fetch(`${this.baseURL}${src}`, { credentials: 'include' });
+                if (!preview.ok) throw new Error('上传后文件读取验证失败');
               }
+              const objectKey = /^https?:\/\//i.test(src)
+                ? decodeURIComponent(new URL(src).pathname.replace(/^\/+/, ''))
+                : src.replace(/^\/file\/r2:/, '');
+              const fileKey = uploadStorageMode === 'r2' ? `r2:${objectKey}` : src.replace(/^\/file\//, '');
+              this.tableData.unshift({
+                name: fileKey,
+                selected: false,
+                metadata: {
+                  TimeStamp: Date.now(),
+                  fileSize: file.size,
+                  fileName: file.name,
+                  storageType: uploadStorageMode,
+                  ...(uploadStorageMode === 'r2' ? { r2Key: objectKey } : {})
+                }
+              });
+              successCount++;
             } catch (err) {
               failed.push(`${file.name} (${err.message})`);
               console.error('Upload error:', err);
@@ -3992,8 +4003,23 @@ curl -X POST "{SITE_URL}/api/v1/import" \
           this.savingSharePassword = false;
         }
       },
-      fileLink(key) {
+      fileAccessUrl(itemOrKey) {
+        const item = typeof itemOrKey === 'string'
+          ? this.tableData.find(file => file.name === itemOrKey) || { name: itemOrKey }
+          : (itemOrKey || {});
+        const key = String(item.name || '');
+        const metadata = item.metadata || {};
+        const isR2 = metadata.storageType === 'r2' || metadata.storage === 'r2' || key.startsWith('r2:');
+        const publicBase = String(this.systemStatus.r2PublicBaseUrl || '').replace(/\/+$/, '');
+        if (isR2 && publicBase && !metadata.sharePasswordProtected) {
+          const objectKey = metadata.r2Key || key.replace(/^r2:/, '');
+          const encodedKey = String(objectKey).split('/').map(encodeURIComponent).join('/');
+          return `${publicBase}/${encodedKey}`;
+        }
         return `${this.baseURL}/file/${encodeURIComponent(key)}`;
+      },
+      fileLink(key) {
+        return this.fileAccessUrl(key);
       },
       handleCopy(index, key) {
         const link = this.fileLink(key);
@@ -4116,7 +4142,8 @@ curl -X POST "{SITE_URL}/api/v1/import" \
         this.selectedFiles.forEach((file, index) => {
           setTimeout(() => {
             const link = document.createElement('a');
-            link.href = this.fileLink(file.name);
+            // 显式下载保留本站代理路径，直链复制和图片预览仍使用 R2 CDN。
+            link.href = `${this.baseURL}/file/${encodeURIComponent(file.name)}`;
             if (file.metadata?.sharePasswordProtected) {
               link.target = '_blank';
               link.rel = 'noopener noreferrer';
@@ -4273,7 +4300,7 @@ curl -X POST "{SITE_URL}/api/v1/import" \
       },
       exportAllLinks() {  // 导出全部链接
         const loading = this.$message({ message: '正在生成链接列表...', duration: 0 });
-        const links = this.tableData.map(file => `${document.location.origin}/file/${file.name}`);
+        const links = this.tableData.map(file => this.fileLink(file.name));
         const linksText = links.join('\n');
         
         // 创建下载文件
@@ -4529,6 +4556,7 @@ curl -X POST "{SITE_URL}/api/v1/import" \
         const formData = new FormData();
         formData.append('file', file);
         formData.append('folderPath', this.folderPath || '');
+        formData.append('storageMode', this.systemStatus.r2.connected && this.systemStatus.r2.enabled ? 'r2' : 'telegram');
         const response = await fetch(`${this.baseURL}/upload`, {
           method: 'POST',
           body: formData,
@@ -4539,7 +4567,7 @@ curl -X POST "{SITE_URL}/api/v1/import" \
           const message = Array.isArray(payload) ? payload[0]?.error : payload?.error;
           throw new Error(message || '上传失败');
         }
-        return `${this.baseURL}${payload[0].src}`;
+        return /^https?:\/\//i.test(payload[0].src) ? payload[0].src : `${this.baseURL}${payload[0].src}`;
       },
       async showUiDesignSettingsPanel() {
         const manager = window.UIDesignManager;
@@ -5092,17 +5120,18 @@ curl -X POST "{SITE_URL}/api/v1/import" \
         this.$message.error('同步数据时出错，请检查网络连接');
       }
 
-      // 检查系统连接状态
-      fetch('./api/status', { credentials: 'include' })
-        .then(response => response.json())
-        .then(status => {
+      // 先加载系统连接状态，确保后台上传首次使用时也能按 R2 默认存储。
+      try {
+        const statusResponse = await fetch('./api/status', { credentials: 'include' });
+        if (statusResponse.ok) {
+          const status = await statusResponse.json();
           this.systemStatus = {
             ...this.systemStatus,
             ...(status || {}),
             github: status?.github || this.systemStatus.github,
           };
-        })
-        .catch(() => {});
+        }
+      } catch (e) {}
 
       // 恢复快捷方式设置
       if (localStorage.getItem('quickWebsites')) {
