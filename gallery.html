@@ -1342,7 +1342,8 @@
 
         downloadImage(img) {
           const link = document.createElement('a');
-          link.href = this.getImageUrl(img);
+          // 显式下载走本站代理，避免跨域链接的 download 属性被浏览器忽略。
+          link.href = `${this.baseURL}/file/${encodeURIComponent(img.name)}`;
           link.download = img.metadata?.fileName || img.name;
           link.click();
         },
