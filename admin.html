@@ -5119,17 +5119,18 @@ curl -X POST "{SITE_URL}/api/v1/import" \
         this.$message.error('同步数据时出错，请检查网络连接');
       }
 
-      // 检查系统连接状态
-      fetch('./api/status', { credentials: 'include' })
-        .then(response => response.json())
-        .then(status => {
+      // 先加载系统连接状态，确保后台上传首次使用时也能按 R2 默认存储。
+      try {
+        const statusResponse = await fetch('./api/status', { credentials: 'include' });
+        if (statusResponse.ok) {
+          const status = await statusResponse.json();
           this.systemStatus = {
             ...this.systemStatus,
             ...(status || {}),
             github: status?.github || this.systemStatus.github,
           };
-        })
-        .catch(() => {});
+        }
+      } catch (e) {}
 
       // 恢复快捷方式设置
       if (localStorage.getItem('quickWebsites')) {
