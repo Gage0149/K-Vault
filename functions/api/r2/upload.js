@@ -64,6 +64,8 @@ export async function onRequestPost(context) {
           fileSize: file.size,
           TimeStamp: timestamp,
           storage: 'r2',
+          storageType: 'r2',
+          r2Key: fileId,
           contentType: file.type || 'application/octet-stream'
         }
       });
