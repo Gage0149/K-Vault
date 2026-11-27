@@ -108,7 +108,7 @@ describe('R2 multipart browser checkpoints', function () {
 describe('R2 public URL integration in the upload page', function () {
   function loadPage(storage = new Map()) {
     const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-    const script = html.match(/<script>\\s*(const LOCAL_PREVIEW_PAGE[\\s\\S]*?)<\\/script>/);
+    const script = html.match(/<script>\s*(const LOCAL_PREVIEW_PAGE[\s\S]*?)<\/script>/);
     assert.ok(script, 'upload page script should exist');
     let options;
     vm.runInNewContext(script[1], {
