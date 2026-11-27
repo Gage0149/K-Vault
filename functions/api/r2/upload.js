@@ -4,6 +4,7 @@
  */
 
 import { createStorageManager, generateKey, getFileType } from '../../utils/storage.js';
+import { getR2PublicUrl, R2_PUBLIC_CACHE_CONTROL } from '../../utils/r2-public-url.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -43,7 +44,8 @@ export async function onRequestPost(context) {
     // 存储到 R2
     await env.R2_BUCKET.put(fileId, content, {
       httpMetadata: {
-        contentType: file.type || 'application/octet-stream'
+        contentType: file.type || 'application/octet-stream',
+        cacheControl: R2_PUBLIC_CACHE_CONTROL
       },
       customMetadata: {
         fileName: file.name,
@@ -69,7 +71,7 @@ export async function onRequestPost(context) {
     
     // 返回成功响应
     return new Response(JSON.stringify([{
-      src: `/file/${fileId}`,
+      src: getR2PublicUrl(env, fileId, `/file/${fileId}`),
       storage: 'r2'
     }]), {
       headers: { 'Content-Type': 'application/json' }
